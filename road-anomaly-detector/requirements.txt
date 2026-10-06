@@ -6,3 +6,5 @@ numpy
 plotly
 scikit-learn==1.7.2
 joblib
+paho-mqtt>=2.0
+matplotlib
