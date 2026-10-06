@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Sensor Log Analyzer</title>
+
+<!-- CHART.JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    body {
+        background: #0f0f0f;
+        color: #e8e8e8;
+        font-family: "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+
+    header {
+        background: #1b1b1b;
+        padding: 20px;
+        text-align: center;
+        font-size: 28px;
+        color: #00eaff;
+        letter-spacing: 1px;
+        border-bottom: 2px solid #00eaff;
+    }
+
+    .container {
+        padding: 25px;
+        max-width: 1200px;
+        margin: auto;
+    }
+
+    .card {
+        background: #1a1a1a;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        box-shadow: 0 0 15px rgba(0,255,255,0.15);
+    }
+
+    h2 {
+        color: #00eaff;
+        border-left: 4px solid #00eaff;
+        padding-left: 10px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    th, td {
+        padding: 10px;
+        border: 1px solid #333;
+        text-align: center;
+    }
+
+    th {
+        background: #252525;
+    }
+
+    .hazard-row {
+        background: #ff2f2f;
+        color: #fff;
+        font-weight: bold;
+    }
+
+</style>
+</head>
+
+<body>
+
+<header>📊 Sensor Data Analyzer — Auto CSV Loader</header>
+
+<div class="container">
+
+    <div class="card" id="summaryCard">
+        <h2>Summary Report</h2>
+        <p id="summaryText">Loading CSV...</p>
+    </div>
+
+    <div class="card">
+        <h2>Distance (cm)</h2>
+        <canvas id="distanceChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>Accelerometer (g)</h2>
+        <canvas id="accelChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>Gyroscope (°/s)</h2>
+        <canvas id="gyroChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>Detected Hazards</h2>
+        <table id="hazardTable">
+            <tr>
+                <th>Timestamp</th>
+                <th>Accel Spike</th>
+                <th>Gyro Spike</th>
+                <th>Distance (cm)</th>
+            </tr>
+        </table>
+    </div>
+
+</div>
+
+<script>
+async function loadCSV() {
+    try {
+        const response = await fetch("sensor_log.csv");
+        const csvText = await response.text();
+        processCSV(csvText);
+    } catch (e) {
+        document.getElementById("summaryText").innerHTML =
+            "<b style='color:red'>Error: Could not load sensor_log.csv</b><br>Make sure the file is in the same folder.";
+    }
+}
+
+function processCSV(csv) {
+    const rows = csv.trim().split("\n").map(r => r.split(","));
+
+    const tsIndex  = rows[0].indexOf("timestamp_iso");
+    const distIndex = rows[0].indexOf("distance_cm");
+    const axI = rows[0].indexOf("acc_x");
+    const ayI = rows[0].indexOf("acc_y");
+    const azI = rows[0].indexOf("acc_z");
+    const gxI = rows[0].indexOf("gyro_x");
+    const gyI = rows[0].indexOf("gyro_y");
+    const gzI = rows[0].indexOf("gyro_z");
+
+    let ts=[], dist=[], ax=[], ay=[], az=[], gx=[], gy=[], gz=[];
+    let hazards = [];
+
+    for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+
+        ts.push(r[tsIndex]);
+        dist.push(parseFloat(r[distIndex]));
+        ax.push(parseFloat(r[axI]));
+        ay.push(parseFloat(r[ayI]));
+        az.push(parseFloat(r[azI]));
+        gx.push(parseFloat(r[gxI]));
+        gy.push(parseFloat(r[gyI]));
+        gz.push(parseFloat(r[gzI]));
+
+        const accelMag = Math.sqrt(r[axI]**2 + r[ayI]**2 + r[azI]**2);
+        const gyroMag = Math.sqrt(r[gxI]**2 + r[gyI]**2 + r[gzI]**2);
+
+        if (accelMag > 0.5 || gyroMag > 30) {
+            hazards.push({
+                ts: r[tsIndex],
+                accel: accelMag.toFixed(3),
+                gyro: gyroMag.toFixed(3),
+                dist: r[distIndex]
+            });
+        }
+    }
+
+    renderSummary(hazards, rows.length - 1);
+    renderHazardTable(hazards);
+    renderCharts(ts, dist, ax, ay, az, gx, gy, gz);
+}
+
+function renderSummary(hazards, totalRows) {
+    document.getElementById("summaryText").innerHTML = `
+        ✅ <b>Total Samples:</b> ${totalRows}<br>
+        ✅ <b>Hazards Detected:</b> ${hazards.length}<br>
+        ✅ <b>First Hazard:</b> ${hazards.length ? hazards[0].ts : "None"}<br>
+    `;
+}
+
+function renderHazardTable(hazards) {
+    const table = document.getElementById("hazardTable");
+    hazards.forEach(h => {
+        table.innerHTML += `
+            <tr class="hazard-row">
+                <td>${h.ts}</td>
+                <td>${h.accel}</td>
+                <td>${h.gyro}</td>
+                <td>${h.dist}</td>
+            </tr>
+        `;
+    });
+}
+
+function renderCharts(ts, dist, ax, ay, az, gx, gy, gz) {
+    new Chart(document.getElementById("distanceChart"), {
+        type: "line",
+        data: {
+            labels: ts,
+            datasets: [{ label: "Distance (cm)", data: dist, borderColor: "cyan" }]
+        }
+    });
+
+    new Chart(document.getElementById("accelChart"), {
+        type: "line",
+        data: {
+            labels: ts,
+            datasets: [
+                { label: "AX", data: ax, borderColor: "red" },
+                { label: "AY", data: ay, borderColor: "green" },
+                { label: "AZ", data: az, borderColor: "blue" }
+            ]
+        }
+    });
+
+    new Chart(document.getElementById("gyroChart"), {
+        type: "line",
+        data: {
+            labels: ts,
+            datasets: [
+                { label: "GX", data: gx, borderColor: "orange" },
+                { label: "GY", data: gy, borderColor: "yellow" },
+                { label: "GZ", data: gz, borderColor: "violet" }
+            ]
+        }
+    });
+}
+
+loadCSV();
+</script>
+
+</body>
+</html>
