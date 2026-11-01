@@ -9,6 +9,8 @@ v1 was a team project at PES University, Sep–Nov 2025. v2 is my own follow-up 
 | v1, Nov 2025 | HTTP POST to Flask | `app.py`, the dashboards, recorded logs, the trained model |
 | v2, Oct 2026 | MQTT (topic per device, QoS 1, retained status + Last Will) | `mqtt/` subscriber and replay publisher, tested end to end; `firmware/` ESP32 sketch, untested |
 
+Not recovered from v1: the original ESP32 sketch and the script that trained the Random Forest. The trained model itself is included.
+
 ## How it works
 
 1. **The rig.** An RC car carries an ESP32, an MPU-6050-class IMU (accelerometer + gyroscope) and an HC-SR04 ultrasonic sensor. It drives along a 120 cm foam test road with potholes and bumps cut into it.
